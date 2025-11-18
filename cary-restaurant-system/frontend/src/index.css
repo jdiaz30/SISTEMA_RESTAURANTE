@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-semibold;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5 focus:ring-primary;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-white hover:bg-secondary/90 hover:shadow-lg hover:-translate-y-0.5 focus:ring-secondary;
+  }
+
+  .btn-success {
+    @apply bg-success text-white hover:bg-success/90 hover:shadow-lg hover:-translate-y-0.5 focus:ring-success;
+  }
+
+  .btn-danger {
+    @apply bg-danger text-white hover:bg-danger/90 hover:shadow-lg hover:-translate-y-0.5 focus:ring-danger;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 p-6;
+  }
+
+  .input {
+    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all;
+  }
+
+  .mesa-libre {
+    @apply bg-success/10 border-2 border-success hover:bg-success/20 cursor-pointer;
+  }
+
+  .mesa-ocupada {
+    @apply bg-danger/10 border-2 border-danger hover:bg-danger/20 cursor-pointer;
+  }
+
+  .mesa-reservada {
+    @apply bg-accent/10 border-2 border-accent hover:bg-accent/20 cursor-pointer;
+  }
+}
+
+@layer utilities {
+  .fade-in {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
