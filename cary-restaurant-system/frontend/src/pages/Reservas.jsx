@@ -9,7 +9,7 @@ function Reservas() {
   const [filtroEstado, setFiltroEstado] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [paginaActual, setPaginaActual] = useState(1);
-  const itemsPorPagina = 10;
+  const itemsPorPagina = 5;
 
 
   const [modalAsignarMesa, setModalAsignarMesa] = useState(false);
@@ -295,6 +295,10 @@ function Reservas() {
         </div>
       ) : (
         <>
+          <div className="mb-4 text-sm text-gray-600">
+            Mostrando {indexPrimero + 1} - {Math.min(indexUltimo, reservasFiltradas.length)} de {reservasFiltradas.length} reserva{reservasFiltradas.length !== 1 ? 's' : ''}
+          </div>
+
           <div className="grid gap-4">
             {reservasPaginadas.map((reserva) => (
             <div key={reserva.id} className="card hover:shadow-lg transition-shadow">
@@ -333,6 +337,13 @@ function Reservas() {
                       </p>
                     </div>
                   </div>
+
+                  {reserva.area_preferida_nombre && (
+                    <div className="mt-2 text-sm">
+                      <span className="text-gray-500">Área preferida:</span>
+                      <span className="ml-2 font-medium text-primary">{reserva.area_preferida_nombre}</span>
+                    </div>
+                  )}
 
                   {reserva.codigo_reserva && (
                     <div className="mt-2">
@@ -432,7 +443,7 @@ function Reservas() {
                 <strong>Personas:</strong> {reservaSeleccionada.numero_personas}
               </p>
               <p className="text-sm text-gray-700">
-                <strong>Área preferida:</strong> {reservaSeleccionada.area_nombre || 'Sin preferencia'}
+                <strong>Área preferida:</strong> {reservaSeleccionada.area_preferida_nombre || 'Sin preferencia'}
               </p>
             </div>
 

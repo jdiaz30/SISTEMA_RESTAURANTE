@@ -219,6 +219,17 @@ function ImprimirFactura() {
             left: 0;
             top: 0;
             width: 100%;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+          }
+
+          /* Ocultar contenedores externos */
+          .min-h-screen {
+            min-height: auto !important;
+            height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
 
           /* Configuración de página */
@@ -232,12 +243,21 @@ function ImprimirFactura() {
             background: white !important;
             margin: 0;
             padding: 0;
+            height: auto !important;
           }
 
           /* Asegurar que los bordes se impriman */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            page-break-after: avoid !important;
+            page-break-before: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
+          /* Evitar saltos de página innecesarios */
+          table, tbody, tr, td, th {
+            page-break-inside: avoid !important;
           }
         }
       `}</style>

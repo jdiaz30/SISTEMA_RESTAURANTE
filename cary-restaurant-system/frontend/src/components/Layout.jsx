@@ -56,7 +56,7 @@ function Layout({ children, setIsAuthenticated }) {
       </nav>
 
       <div className="flex">
-        <aside className="w-64 bg-white shadow-sm min-h-screen border-r border-gray-200">
+        <aside className="w-64 bg-white shadow-sm border-r border-gray-200 fixed left-0 top-16 bottom-0 overflow-y-auto">
           <nav className="p-4 space-y-2">
             {menuItems.map((item) => (
               <Link
@@ -75,7 +75,7 @@ function Layout({ children, setIsAuthenticated }) {
           </nav>
         </aside>
 
-        <main className="flex-1 p-8 max-w-7xl">
+        <main className="flex-1 p-8 max-w-7xl ml-64">
           {children}
         </main>
       </div>

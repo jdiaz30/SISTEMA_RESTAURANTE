@@ -10,10 +10,12 @@ function Pedidos() {
   const [carrito, setCarrito] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
-
-
+  const [posicionSeleccionada, setPosicionSeleccionada] = useState(1);
+  const [numPosiciones, setNumPosiciones] = useState(4);
   const [pedidoActual, setPedidoActual] = useState(null);
   const [mostrarPedidoActual, setMostrarPedidoActual] = useState(true);
+  const [paginaActual, setPaginaActual] = useState(1);
+  const productosPorPagina = 8;
 
   useEffect(() => {
     cargarDatos();
@@ -26,7 +28,7 @@ function Pedidos() {
         productosAPI.getAll(),
         productosAPI.getCategorias()
       ]);
-      setMesas(mesasRes.data.filter(m => m.estado === 'libre' || m.estado === 'ocupada'));
+      setMesas(mesasRes.data.filter(m => m.estado === 'ocupada'));
       setProductos(productosRes.data.filter(p => p.disponible));
       setCategorias(categoriasRes.data);
     } catch (error) {
@@ -81,6 +83,11 @@ function Pedidos() {
     setMesaSeleccionada(mesaId);
 
     if (mesaId) {
+      const mesa = mesas.find(m => m.id === parseInt(mesaId));
+      if (mesa) {
+        setNumPosiciones(mesa.capacidad);
+        setPosicionSeleccionada(1);
+      }
       await cargarPedidoActual(mesaId);
     } else {
       setPedidoActual(null);
@@ -91,12 +98,20 @@ function Pedidos() {
     ? productos
     : productos.filter(p => p.categoria_id === parseInt(categoriaSeleccionada));
 
+  // Paginación
+  const indexUltimo = paginaActual * productosPorPagina;
+  const indexPrimero = indexUltimo - productosPorPagina;
+  const productosPaginados = productosFiltrados.slice(indexPrimero, indexUltimo);
+  const totalPaginas = Math.ceil(productosFiltrados.length / productosPorPagina);
+
   const agregarAlCarrito = (producto) => {
-    const itemExistente = carrito.find(item => item.producto_id === producto.id);
+    const itemExistente = carrito.find(
+      item => item.producto_id === producto.id && item.posicion === posicionSeleccionada
+    );
 
     if (itemExistente) {
       setCarrito(carrito.map(item =>
-        item.producto_id === producto.id
+        item.producto_id === producto.id && item.posicion === posicionSeleccionada
           ? { ...item, cantidad: item.cantidad + 1 }
           : item
       ));
@@ -105,22 +120,23 @@ function Pedidos() {
         producto_id: producto.id,
         nombre: producto.nombre,
         precio_unitario: producto.precio,
-        cantidad: 1
+        cantidad: 1,
+        posicion: posicionSeleccionada
       }]);
     }
   };
 
-  const quitarDelCarrito = (productoId) => {
-    setCarrito(carrito.filter(item => item.producto_id !== productoId));
+  const quitarDelCarrito = (productoId, posicion) => {
+    setCarrito(carrito.filter(item => !(item.producto_id === productoId && item.posicion === posicion)));
   };
 
-  const actualizarCantidad = (productoId, nuevaCantidad) => {
+  const actualizarCantidad = (productoId, posicion, nuevaCantidad) => {
     if (nuevaCantidad < 1) {
-      quitarDelCarrito(productoId);
+      quitarDelCarrito(productoId, posicion);
       return;
     }
     setCarrito(carrito.map(item =>
-      item.producto_id === productoId
+      item.producto_id === productoId && item.posicion === posicion
         ? { ...item, cantidad: nuevaCantidad }
         : item
     ));
@@ -215,6 +231,32 @@ function Pedidos() {
             </select>
           </div>
 
+          {mesaSeleccionada && (
+            <div className="card mb-4 bg-gradient-to-r from-primary/5 to-secondary/5">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Posición en la Mesa (Silla)
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {Array.from({ length: numPosiciones }, (_, i) => i + 1).map((pos) => (
+                  <button
+                    key={pos}
+                    onClick={() => setPosicionSeleccionada(pos)}
+                    className={`w-14 h-14 rounded-lg font-bold text-lg transition-all ${
+                      posicionSeleccionada === pos
+                        ? 'bg-primary text-white shadow-lg scale-110'
+                        : 'bg-white border-2 border-gray-300 hover:border-primary hover:scale-105'
+                    }`}
+                  >
+                    {pos}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-600 mt-2">
+                Selecciona la posición/silla para la que estás tomando el pedido
+              </p>
+            </div>
+          )}
+
           {pedidoActual && (
             <div className="card mb-4 bg-yellow-50 border-2 border-yellow-400">
               <div className="flex justify-between items-center mb-3">
@@ -232,28 +274,40 @@ function Pedidos() {
                 <p className="text-lg font-bold text-primary">Total: RD${parseFloat(pedidoActual.total).toFixed(2)}</p>
               </div>
 
-              {mostrarPedidoActual && (
+              {mostrarPedidoActual && pedidoActual.items && (
                 <div className="mt-4 space-y-2">
                   <h4 className="font-semibold text-sm mb-2">Items del Pedido:</h4>
-                  {pedidoActual.items && pedidoActual.items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center p-2 bg-white rounded border">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{item.producto_nombre}</p>
-                        <p className="text-xs text-gray-600">
-                          {item.cantidad} x RD${parseFloat(item.precio_unitario).toFixed(2)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <p className="font-semibold">
-                          RD${(item.cantidad * parseFloat(item.precio_unitario)).toFixed(2)}
-                        </p>
-                        <button
-                          onClick={() => eliminarItemPedido(item.id)}
-                          className="text-danger hover:bg-danger/10 px-2 py-1 rounded text-sm"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
+                  {Array.from(new Set(pedidoActual.items.map(item => item.posicion || 0))).sort().map(posicion => (
+                    <div key={posicion} className="mb-3">
+                      {posicion > 0 && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center font-bold text-xs">
+                            {posicion}
+                          </div>
+                          <span className="text-xs font-semibold text-gray-600">Posición {posicion}</span>
+                        </div>
+                      )}
+                      {pedidoActual.items.filter(item => (item.posicion || 0) === posicion).map((item) => (
+                        <div key={item.id} className="flex justify-between items-center p-2 bg-white rounded border mb-1">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{item.producto_nombre}</p>
+                            <p className="text-xs text-gray-600">
+                              {item.cantidad} x RD${parseFloat(item.precio_unitario).toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <p className="font-semibold text-sm">
+                              RD${(item.cantidad * parseFloat(item.precio_unitario)).toFixed(2)}
+                            </p>
+                            <button
+                              onClick={() => eliminarItemPedido(item.id)}
+                              className="text-danger hover:bg-danger/10 px-2 py-1 rounded text-sm"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -264,7 +318,10 @@ function Pedidos() {
           <div className="card mb-4">
             <div className="flex gap-2 flex-wrap">
               <button
-                onClick={() => setCategoriaSeleccionada('todas')}
+                onClick={() => {
+                  setCategoriaSeleccionada('todas');
+                  setPaginaActual(1);
+                }}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   categoriaSeleccionada === 'todas'
                     ? 'bg-primary text-white'
@@ -276,7 +333,10 @@ function Pedidos() {
               {categorias.map(cat => (
                 <button
                   key={cat.id}
-                  onClick={() => setCategoriaSeleccionada(cat.id.toString())}
+                  onClick={() => {
+                    setCategoriaSeleccionada(cat.id.toString());
+                    setPaginaActual(1);
+                  }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     categoriaSeleccionada === cat.id.toString()
                       ? 'bg-primary text-white'
@@ -290,7 +350,7 @@ function Pedidos() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {productosFiltrados.map(producto => (
+            {productosPaginados.map(producto => (
               <div key={producto.id} className="card hover:shadow-lg transition-shadow">
                 <div className="flex justify-between items-start mb-2">
                   <div>
@@ -318,6 +378,42 @@ function Pedidos() {
               <p className="text-gray-500">No hay productos disponibles en esta categoría</p>
             </div>
           )}
+
+          {totalPaginas > 1 && (
+            <div className="mt-6 flex justify-center items-center gap-2">
+              <button
+                onClick={() => setPaginaActual(paginaActual - 1)}
+                disabled={paginaActual === 1}
+                className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+
+              <div className="flex gap-2">
+                {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(numero => (
+                  <button
+                    key={numero}
+                    onClick={() => setPaginaActual(numero)}
+                    className={`px-4 py-2 rounded-lg ${
+                      paginaActual === numero
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-100 hover:bg-gray-200'
+                    }`}
+                  >
+                    {numero}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setPaginaActual(paginaActual + 1)}
+                disabled={paginaActual === totalPaginas}
+                className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Siguiente
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="lg:col-span-1">
@@ -329,33 +425,43 @@ function Pedidos() {
             ) : (
               <>
                 <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
-                  {carrito.map(item => (
-                    <div key={item.producto_id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{item.nombre}</p>
-                        <p className="text-xs text-gray-600">RD$ {parseFloat(item.precio_unitario).toFixed(2)}</p>
+                  {Array.from(new Set(carrito.map(item => item.posicion))).sort().map(posicion => (
+                    <div key={posicion} className="mb-4">
+                      <div className="flex items-center gap-2 mb-2 sticky top-0 bg-white py-1">
+                        <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                          {posicion}
+                        </div>
+                        <span className="text-sm font-semibold text-gray-700">Posición {posicion}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => actualizarCantidad(item.producto_id, item.cantidad - 1)}
-                          className="w-6 h-6 rounded bg-gray-300 hover:bg-gray-400 flex items-center justify-center"
-                        >
-                          -
-                        </button>
-                        <span className="w-8 text-center font-medium">{item.cantidad}</span>
-                        <button
-                          onClick={() => actualizarCantidad(item.producto_id, item.cantidad + 1)}
-                          className="w-6 h-6 rounded bg-primary text-white hover:bg-primary/90 flex items-center justify-center"
-                        >
-                          +
-                        </button>
-                      </div>
-                      <button
-                        onClick={() => quitarDelCarrito(item.producto_id)}
-                        className="text-danger hover:text-danger/80"
-                      >
-                        ✕
-                      </button>
+                      {carrito.filter(item => item.posicion === posicion).map(item => (
+                        <div key={`${item.producto_id}-${item.posicion}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg mb-2 ml-4">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{item.nombre}</p>
+                            <p className="text-xs text-gray-600">RD$ {parseFloat(item.precio_unitario).toFixed(2)}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => actualizarCantidad(item.producto_id, item.posicion, item.cantidad - 1)}
+                              className="w-6 h-6 rounded bg-gray-300 hover:bg-gray-400 flex items-center justify-center text-sm"
+                            >
+                              -
+                            </button>
+                            <span className="w-8 text-center font-medium text-sm">{item.cantidad}</span>
+                            <button
+                              onClick={() => actualizarCantidad(item.producto_id, item.posicion, item.cantidad + 1)}
+                              className="w-6 h-6 rounded bg-primary text-white hover:bg-primary/90 flex items-center justify-center text-sm"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => quitarDelCarrito(item.producto_id, item.posicion)}
+                            className="text-danger hover:text-danger/80 text-sm"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>

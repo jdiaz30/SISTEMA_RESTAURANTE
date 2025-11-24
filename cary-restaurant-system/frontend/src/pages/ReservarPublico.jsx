@@ -54,7 +54,6 @@ function ReservarPublico() {
       const response = await reservasAPI.create(formData);
       setSuccess(response.data);
 
-
       setFormData({
         cliente_nombre: '',
         cliente_telefono: '',
@@ -100,7 +99,10 @@ function ReservarPublico() {
               </p>
             </div>
             <p className="text-sm text-gray-600 mt-4">
-              Guarda este código. Lo necesitarás para consultar o cancelar tu reserva.
+              <strong>Guarda este código.</strong> Lo necesitarás para consultar o cancelar tu reserva.
+            </p>
+            <p className="text-sm text-gray-500 mt-3">
+              📧 Recibirás un correo de confirmación cuando el restaurante confirme tu reserva y asigne tu mesa.
             </p>
             <a
               href="/reservas/verificar"
@@ -157,7 +159,7 @@ function ReservarPublico() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Correo electrónico (opcional)
+                Correo electrónico <span className="text-danger">*</span>
               </label>
               <input
                 type="email"
@@ -165,8 +167,12 @@ function ReservarPublico() {
                 value={formData.cliente_email}
                 onChange={handleChange}
                 className="input"
+                required
                 placeholder="correo@ejemplo.com"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Te enviaremos la confirmación de tu reserva a este correo
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -229,7 +235,7 @@ function ReservarPublico() {
                 onChange={handleChange}
                 className="input"
               >
-                <option value="">Sin preferencia (asignación automática)</option>
+                <option value="">Sin preferencia</option>
                 {areas.map((area) => (
                   <option key={area.id} value={area.id}>
                     {area.nombre}
@@ -237,7 +243,7 @@ function ReservarPublico() {
                 ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Si no seleccionas un área, el sistema asignará automáticamente según disponibilidad
+                El personal asignará tu mesa manualmente al confirmar la reserva
               </p>
             </div>
 

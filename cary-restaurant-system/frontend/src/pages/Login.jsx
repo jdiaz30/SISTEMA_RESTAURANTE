@@ -4,7 +4,7 @@ import { authAPI } from '../services/api';
 function Login({ setIsAuthenticated }) {
   const [formData, setFormData] = useState({
     email: 'admin@cary.com',
-    password: '123456'
+    password: 'admin123'
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -84,9 +84,9 @@ function Login({ setIsAuthenticated }) {
               Usuarios de prueba:
             </p>
             <div className="space-y-1 text-xs text-gray-500">
-              <p>👤 admin@cary.com / 123456</p>
-              <p>👤 carmen@cary.com / 123456</p>
-              <p>👤 maria@cary.com / 123456</p>
+              <p>👤 admin@cary.com / admin123</p>
+              <p>👤 carmen@cary.com / admin123</p>
+              <p>👤 maria@cary.com / admin123</p>
             </div>
           </div>
         </div>

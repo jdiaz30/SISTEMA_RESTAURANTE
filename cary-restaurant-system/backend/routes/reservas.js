@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { verificarToken } = require('../middleware/auth');
+const { enviarEmailConfirmacion } = require('../services/emailService');
 
 function generarCodigoReserva() {
   const fecha = new Date();
@@ -18,10 +19,11 @@ router.get('/', verificarToken, async (req, res) => {
 
     let query = `
       SELECT r.*, m.numero as mesa_numero, m.capacidad as mesa_capacidad,
-             a.nombre as area_nombre
+             a.nombre as area_nombre, ap.nombre as area_preferida_nombre
       FROM reservas r
       LEFT JOIN mesas m ON r.mesa_id = m.id
       LEFT JOIN areas a ON m.area_id = a.id
+      LEFT JOIN areas ap ON r.area_preferida = ap.id
       WHERE 1=1
     `;
     const params = [];
@@ -51,10 +53,12 @@ router.get('/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
 
     const result = await pool.query(`
-      SELECT r.*, m.numero as mesa_numero, a.nombre as area_nombre
+      SELECT r.*, m.numero as mesa_numero, a.nombre as area_nombre,
+             ap.nombre as area_preferida_nombre
       FROM reservas r
       LEFT JOIN mesas m ON r.mesa_id = m.id
       LEFT JOIN areas a ON m.area_id = a.id
+      LEFT JOIN areas ap ON r.area_preferida = ap.id
       WHERE r.id = $1
     `, [id]);
 
@@ -78,13 +82,14 @@ router.post('/', async (req, res) => {
       fecha,
       hora,
       num_personas,
+      area_preferida,
       notas
     } = req.body;
 
-    if (!cliente_nombre || !cliente_telefono || !fecha || !hora || !num_personas) {
+    if (!cliente_nombre || !cliente_telefono || !cliente_email || !fecha || !hora || !num_personas) {
       return res.status(400).json({
         error: 'Faltan campos requeridos',
-        requeridos: ['cliente_nombre', 'cliente_telefono', 'fecha', 'hora', 'num_personas']
+        requeridos: ['cliente_nombre', 'cliente_telefono', 'cliente_email', 'fecha', 'hora', 'num_personas']
       });
     }
 
@@ -95,21 +100,12 @@ router.post('/', async (req, res) => {
       codigoExiste = await pool.query('SELECT id FROM reservas WHERE codigo_reserva = $1', [codigo_reserva]);
     }
 
-    const mesaResult = await pool.query(`
-      SELECT id FROM mesas
-      WHERE capacidad >= $1 AND estado = 'libre' AND activo = TRUE
-      ORDER BY capacidad
-      LIMIT 1
-    `, [num_personas]);
-
-    const mesa_id = mesaResult.rows.length > 0 ? mesaResult.rows[0].id : null;
-
     const result = await pool.query(`
       INSERT INTO reservas (
         codigo_reserva, cliente_nombre, cliente_telefono, cliente_email,
-        fecha, hora, num_personas, mesa_id, notas, estado
+        fecha, hora, num_personas, mesa_id, area_preferida, notas, estado
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `, [
       codigo_reserva,
@@ -119,7 +115,8 @@ router.post('/', async (req, res) => {
       fecha,
       hora,
       num_personas,
-      mesa_id,
+      null,
+      area_preferida || null,
       notas,
       'pendiente'
     ]);
@@ -180,6 +177,20 @@ router.put('/:id', verificarToken, async (req, res) => {
         "UPDATE mesas SET estado = 'reservada' WHERE id = $1",
         [reserva.mesa_id]
       );
+
+      const reservaCompleta = await client.query(`
+        SELECT r.*, m.numero as mesa_numero, a.nombre as area_nombre
+        FROM reservas r
+        LEFT JOIN mesas m ON r.mesa_id = m.id
+        LEFT JOIN areas a ON m.area_id = a.id
+        WHERE r.id = $1
+      `, [id]);
+
+      if (reservaCompleta.rows.length > 0) {
+        enviarEmailConfirmacion(reservaCompleta.rows[0]).catch(err => {
+          console.error('Error al enviar email (no crítico):', err);
+        });
+      }
     }
 
     if (estado === 'completada' && reserva.mesa_id) {

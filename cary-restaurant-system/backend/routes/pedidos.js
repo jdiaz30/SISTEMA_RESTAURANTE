@@ -127,6 +127,12 @@ router.post('/', verificarToken, async (req, res) => {
         RETURNING *
       `, [subtotal, impuesto, total, pedido_id]);
 
+      // Si la mesa está reservada, cambiarla a ocupada al agregar items
+      await client.query(
+        "UPDATE mesas SET estado = 'ocupada' WHERE id = $1 AND estado = 'reservada'",
+        [mesa_id]
+      );
+
     } else {
 
       let subtotal = 0;

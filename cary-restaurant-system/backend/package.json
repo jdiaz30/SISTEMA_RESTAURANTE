@@ -8,17 +8,25 @@
     "dev": "nodemon server.js",
     "seed": "node database/seed.js"
   },
-  "keywords": ["restaurant", "management", "api"],
-  "authors": ["Fausto Tavarez", "Christ Louis Medina Ramos"],
+  "keywords": [
+    "restaurant",
+    "management",
+    "api"
+  ],
+  "authors": [
+    "Fausto Tavarez",
+    "Christ Louis Medina Ramos"
+  ],
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "pg": "^8.11.3",
-    "bcryptjs": "^2.4.3",
+    "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "nodemailer": "^7.0.10",
+    "pg": "^8.11.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

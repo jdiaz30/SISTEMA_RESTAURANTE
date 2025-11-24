@@ -2,15 +2,47 @@
 
 Sistema completo de gestión para restaurantes desarrollado con Node.js, Express, React y PostgreSQL.
 
-## Características
+## Características Principales
 
-- **Gestión de Mesas**: Control de estados (libre, ocupada, reservada) por áreas
-- **Reservas**: Sistema de reservas con confirmación y seguimiento
-- **Pedidos**: Toma de pedidos con seguimiento de estados
+- **Gestión de Mesas**: Control de estados (libre, ocupada, reservada) organizadas por áreas (Salón Principal, Terraza, VIP)
+- **Reservas**: Sistema de reservas con asignación manual de mesas, confirmación por email y seguimiento de estados
+- **Pedidos**: Toma de pedidos con posiciones personalizadas, consolidación automática y gestión de items
 - **Facturación**: Generación de facturas con soporte para pagos divididos personalizados
-- **Productos**: Administración de menú y categorías
-- **Dashboard**: Estadísticas de ventas y métricas del día
-- **Autenticación**: Sistema de login con roles (admin/mesero)
+- **Productos**: Administración de menú con categorías y paginación
+- **Dashboard**: Estadísticas en tiempo real de ventas, mesas y métricas del día
+- **Autenticación**: Sistema de login seguro con JWT y roles (admin/mesero)
+- **Reservas Públicas**: Página web pública para que clientes hagan reservas con confirmación por email
+
+## Funcionalidades Destacadas
+
+### Gestión Inteligente de Mesas
+- **Cambios automáticos de estado**:
+  - Reserva confirmada → Mesa "reservada"
+  - Cliente llega y se crea pedido → Mesa "ocupada"
+  - Factura pagada → Mesa "libre"
+- **Cambios manuales**: Para atender walk-ins (clientes sin reserva)
+- **Vista por áreas**: Visualización agrupada de mesas por zona del restaurante
+
+### Sistema de Pedidos Avanzado
+- **Consolidación automática**: Múltiples items se agregan al mismo pedido activo
+- **Posiciones por comensal**: Organizar pedido por cada persona en la mesa
+- **Eliminar items**: Corrección de errores al eliminar items del pedido
+- **Paginación**: Navegación fácil con 8 productos por página
+
+### Reservas Completas
+- **Asignación manual de mesas**: Control total del staff sobre qué mesa asignar
+- **Notificaciones por email**: Confirmación automática vía EmailJS
+- **Códigos únicos**: Cada reserva tiene un código para verificación
+- **Paginación**: 5 reservas por página con indicadores de total
+- **Filtros avanzados**: Por fecha, estado y búsqueda por nombre/teléfono/código
+
+### Facturación Flexible
+- **Pagos divididos personalizados**:
+  - División equitativa entre N personas
+  - Selección manual de productos por cliente
+  - Monto personalizado
+  - Combinación de métodos de pago (efectivo, tarjeta, transferencia)
+- **Impresión de facturas**: Vista optimizada para imprimir
 
 ## Requisitos Previos
 
@@ -23,7 +55,7 @@ Sistema completo de gestión para restaurantes desarrollado con Node.js, Express
 ### 1. Clonar el Repositorio
 
 ```bash
-git clone <url-del-repositorio>
+git clone https://github.com/tu-usuario/cary-restaurant-system.git
 cd cary-restaurant-system
 ```
 
@@ -35,11 +67,22 @@ Crear una base de datos PostgreSQL:
 CREATE DATABASE restaurante_cary;
 ```
 
-Ejecutar el script de base de datos:
+Ejecutar los scripts de base de datos:
 
 ```bash
 psql -U postgres -d restaurante_cary -f database/schema.sql
 psql -U postgres -d restaurante_cary -f database/migration_add_factura_pagos.sql
+psql -U postgres -d restaurante_cary -f database/migration_add_posiciones.sql
+```
+
+**Opcional - Limpiar datos de prueba:**
+
+```bash
+# Para eliminar solo transacciones (mantiene productos, mesas, áreas)
+psql -U postgres -d restaurante_cary -f database/limpiar_data_prueba.sql
+
+# Para eliminar TODO (excepto usuarios)
+psql -U postgres -d restaurante_cary -f database/limpiar_todo_completo.sql
 ```
 
 ### 3. Configurar Backend
@@ -73,7 +116,17 @@ Crear archivo `.env` en la carpeta `frontend`:
 
 ```env
 VITE_API_URL=http://localhost:5000/api
+VITE_EMAILJS_SERVICE_ID=tu_service_id
+VITE_EMAILJS_TEMPLATE_ID=tu_template_id
+VITE_EMAILJS_PUBLIC_KEY=tu_public_key
 ```
+
+**Nota sobre EmailJS**: El sistema usa EmailJS para enviar confirmaciones de reservas. Si no configuras estas variables, el sistema funcionará pero no enviará emails. Para configurarlo:
+
+1. Crea una cuenta en [EmailJS](https://www.emailjs.com/)
+2. Configura un servicio de email (Gmail recomendado)
+3. Crea un template con las variables: `cliente_nombre`, `fecha`, `hora`, `num_personas`, `codigo_reserva`
+4. Copia tus credenciales al `.env`
 
 ## Ejecutar el Proyecto
 
@@ -113,81 +166,174 @@ Usuario mesero:
 cary-restaurant-system/
 ├── backend/
 │   ├── config/
-│   │   └── database.js
+│   │   └── database.js          # Configuración de PostgreSQL
 │   ├── middleware/
-│   │   └── auth.js
+│   │   └── auth.js               # Middleware de autenticación JWT
 │   ├── routes/
-│   │   ├── auth.js
-│   │   ├── dashboard.js
-│   │   ├── facturas.js
-│   │   ├── mesas.js
-│   │   ├── pedidos.js
-│   │   ├── productos.js
-│   │   └── reservas.js
+│   │   ├── auth.js               # Login y autenticación
+│   │   ├── dashboard.js          # Estadísticas y métricas
+│   │   ├── facturas.js           # Facturación y pagos
+│   │   ├── mesas.js              # Gestión de mesas y áreas
+│   │   ├── pedidos.js            # Pedidos con consolidación
+│   │   ├── productos.js          # Productos y categorías
+│   │   └── reservas.js           # Reservas con asignación manual
 │   ├── .env
 │   ├── index.js
 │   └── package.json
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
+│   │   │   ├── ErrorBoundary.jsx # Manejo global de errores
+│   │   │   └── Layout.jsx        # Layout principal con navegación
+│   │   ├── config/
+│   │   │   └── emailjs.js        # Configuración de EmailJS
 │   │   ├── pages/
+│   │   │   ├── Dashboard.jsx     # Página principal con estadísticas
+│   │   │   ├── Mesas.jsx         # Gestión de mesas por área
+│   │   │   ├── Reservas.jsx      # Gestión de reservas con paginación
+│   │   │   ├── Pedidos.jsx       # Toma de pedidos con paginación
+│   │   │   ├── Facturacion.jsx   # Facturación con pagos divididos
+│   │   │   ├── Productos.jsx     # Administración de productos
+│   │   │   ├── ReservarPublico.jsx   # Página pública de reservas
+│   │   │   ├── VerificarReserva.jsx  # Verificación de código
+│   │   │   └── ImprimirFactura.jsx   # Vista de impresión
 │   │   ├── services/
+│   │   │   ├── api.js            # Configuración de Axios
+│   │   │   └── emailService.js   # Servicio de emails
 │   │   ├── App.jsx
 │   │   └── main.jsx
 │   ├── .env
 │   └── package.json
 └── database/
-    ├── schema.sql
-    └── migration_add_factura_pagos.sql
+    ├── schema.sql                     # Esquema inicial de BD
+    ├── migration_add_factura_pagos.sql    # Migración de pagos
+    ├── migration_add_posiciones.sql       # Migración de posiciones
+    ├── limpiar_data_prueba.sql           # Limpiar transacciones
+    └── limpiar_todo_completo.sql         # Limpiar todo
 ```
 
 ## Tecnologías Utilizadas
 
 ### Backend
-- Node.js
-- Express.js
-- PostgreSQL
-- JWT (autenticación)
-- bcryptjs (encriptación)
+- **Node.js** - Runtime de JavaScript
+- **Express.js** - Framework web
+- **PostgreSQL** - Base de datos relacional
+- **JWT** - Autenticación mediante tokens
+- **bcryptjs** - Encriptación de contraseñas
 
 ### Frontend
-- React
-- Vite
-- Tailwind CSS
-- Axios
-- React Router DOM
+- **React 18** - Librería de UI
+- **Vite** - Build tool y dev server
+- **Tailwind CSS** - Framework de estilos
+- **Axios** - Cliente HTTP
+- **React Router DOM** - Enrutamiento
+- **EmailJS** - Envío de emails desde el navegador
 
-## Funcionalidades Principales
+## Flujo de Trabajo del Sistema
 
-### Flujo de Trabajo
+### 1. Reservas (Flujo Completo)
 
-1. **Reservas**: Cliente reserva → Staff confirma → Cliente llega → Mesa pasa a ocupada
-2. **Pedidos**: Seleccionar mesa → Agregar productos → Enviar a cocina
-3. **Facturación**: Seleccionar mesa → Elegir tipo de pago → Generar factura → Imprimir
+```
+Cliente web → Llena formulario → Sistema crea reserva → Email de confirmación
+                                        ↓
+Staff en dashboard → Asigna mesa manualmente → Confirma reserva
+                                        ↓
+Mesa cambia a "reservada" → Cliente llega → Staff crea pedido
+                                        ↓
+Mesa cambia a "ocupada" automáticamente
+```
 
-### Pagos Divididos
+### 2. Walk-ins (Sin Reserva)
 
-El sistema permite dividir pagos de forma personalizada:
-- División equitativa entre N personas
-- Selección manual de productos por cliente
-- Monto personalizado
-- Combinación de métodos de pago
+```
+Cliente llega → Staff cambia mesa a "ocupada" manualmente → Crea pedido
+```
+
+### 3. Pedidos
+
+```
+Mesero selecciona mesa → Agrega productos al carrito → Envía a cocina
+                                        ↓
+Si existe pedido activo → Items se agregan automáticamente
+Si no existe → Se crea nuevo pedido
+                                        ↓
+Cocina cambia estado: pendiente → preparando → listo
+```
+
+### 4. Facturación
+
+```
+Mesa con pedido listo → Facturación → Elige tipo de pago:
+                                        ↓
+├─ Pago completo → 1 factura → Mesa libre
+├─ Dividir equitativo → N facturas iguales
+├─ Dividir por items → Seleccionar productos por persona
+└─ Monto personalizado → Especificar cantidad exacta
+```
+
+## Manejo de Errores
+
+El sistema incluye **ErrorBoundary** en React que captura errores globales y muestra una página amigable con opciones de:
+- Recargar la página
+- Volver al Dashboard
+- Ver detalles técnicos (solo en desarrollo)
 
 ## Resolución de Problemas
 
 ### Error de conexión a la base de datos
 Verificar que PostgreSQL esté ejecutándose y las credenciales en `.env` sean correctas.
 
+```bash
+# Verificar estado de PostgreSQL
+sudo systemctl status postgresql
+
+# Reiniciar si es necesario
+sudo systemctl restart postgresql
+```
+
 ### Puerto en uso
 Cambiar el puerto en el archivo `.env` del backend si el puerto 5000 está ocupado.
 
 ### Error en npm install
-Eliminar `node_modules` y `package-lock.json`, luego ejecutar `npm install` nuevamente.
+Eliminar `node_modules` y `package-lock.json`, luego ejecutar `npm install` nuevamente:
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Emails no se envían
+Verificar que las variables de EmailJS estén correctamente configuradas en `frontend/.env`. El sistema funcionará sin emails pero no enviará confirmaciones.
+
+### Migraciones no aplicadas
+Si hay errores relacionados con columnas faltantes, asegúrate de ejecutar todas las migraciones:
+
+```bash
+psql -U postgres -d restaurante_cary -f database/migration_add_factura_pagos.sql
+psql -U postgres -d restaurante_cary -f database/migration_add_posiciones.sql
+```
+
+## Características de Seguridad
+
+- **Autenticación JWT**: Tokens seguros con expiración
+- **Contraseñas encriptadas**: Usando bcryptjs con salt
+- **Variables de entorno**: Credenciales sensibles en `.env`
+- **Validación de roles**: Middleware de autenticación en todas las rutas protegidas
+- **SQL parametrizado**: Prevención de inyección SQL
+
+## Mejoras Futuras
+
+- [ ] Reportes avanzados con gráficas
+- [ ] Notificaciones push para cocina
+- [ ] App móvil para meseros
+- [ ] Sistema de propinas
+- [ ] Integración con POS físicos
+- [ ] Multi-restaurante (franquicias)
 
 ## Autor
 
-Proyecto desarrollado para gestión de restaurante.
+Sistema desarrollado para gestión integral de Restaurante Cary.
 
 ## Licencia
 
-Este proyecto es de uso académico/privado.
+Este proyecto es de uso privado para fines comerciales del Restaurante Cary.
