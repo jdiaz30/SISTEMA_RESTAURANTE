@@ -331,4 +331,31 @@ router.post('/cancelar-publica', async (req, res) => {
   }
 });
 
+// Obtener reserva activa de una mesa
+router.get('/mesa/:mesaId/activa', verificarToken, async (req, res) => {
+  try {
+    const { mesaId } = req.params;
+
+    const result = await pool.query(`
+      SELECT r.*, m.numero as mesa_numero, a.nombre as area_nombre
+      FROM reservas r
+      LEFT JOIN mesas m ON r.mesa_id = m.id
+      LEFT JOIN areas a ON m.area_id = a.id
+      WHERE r.mesa_id = $1
+        AND r.estado IN ('confirmada', 'completada')
+      ORDER BY r.fecha DESC, r.hora DESC
+      LIMIT 1
+    `, [mesaId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No hay reserva activa para esta mesa' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error al obtener reserva activa:', error);
+    res.status(500).json({ error: 'Error al obtener reserva activa' });
+  }
+});
+
 module.exports = router;

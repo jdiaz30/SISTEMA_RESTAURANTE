@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { pedidosAPI, productosAPI, mesasAPI } from '../services/api';
+import { pedidosAPI, productosAPI, mesasAPI, reservasAPI } from '../services/api';
 
 function Pedidos() {
   const [mesas, setMesas] = useState([]);
@@ -15,6 +15,7 @@ function Pedidos() {
   const [pedidoActual, setPedidoActual] = useState(null);
   const [mostrarPedidoActual, setMostrarPedidoActual] = useState(true);
   const [paginaActual, setPaginaActual] = useState(1);
+  const [reservaActiva, setReservaActiva] = useState(null);
   const productosPorPagina = 8;
 
   useEffect(() => {
@@ -39,9 +40,19 @@ function Pedidos() {
     }
   };
 
-  const cargarPedidoActual = async (mesaId) => {
+  const cargarPedidoActual = async (mesaId, reservaId) => {
     try {
-      const response = await pedidosAPI.getAll({ mesa_id: mesaId, estado: 'pendiente,preparando,listo' });
+      // Filtrar por mesa_id Y reserva_id para evitar mezclar pedidos de diferentes clientes
+      const params = {
+        mesa_id: mesaId,
+        estado: 'pendiente,preparando,listo'
+      };
+
+      if (reservaId) {
+        params.reserva_id = reservaId;
+      }
+
+      const response = await pedidosAPI.getAll(params);
       if (response.data && response.data.length > 0) {
         const pedidoId = response.data[0].id;
         // Incluir items facturados (true) para mostrar todo el pedido en Pedidos
@@ -71,7 +82,7 @@ function Pedidos() {
         cargarDatos();
       } else {
         alert('Item eliminado correctamente');
-        await cargarPedidoActual(mesaSeleccionada);
+        await cargarPedidoActual(mesaSeleccionada, reservaActiva?.id);
       }
     } catch (error) {
       console.error('Error al eliminar item:', error);
@@ -89,9 +100,20 @@ function Pedidos() {
         setNumPosiciones(mesa.capacidad);
         setPosicionSeleccionada(1);
       }
-      await cargarPedidoActual(mesaId);
+
+      // Obtener reserva activa para esta mesa
+      try {
+        const reservaResponse = await reservasAPI.getReservaActiva(mesaId);
+        setReservaActiva(reservaResponse.data);
+        await cargarPedidoActual(mesaId, reservaResponse.data.id);
+      } catch (error) {
+        console.error('No hay reserva activa para esta mesa:', error);
+        setReservaActiva(null);
+        await cargarPedidoActual(mesaId, null);
+      }
     } else {
       setPedidoActual(null);
+      setReservaActiva(null);
     }
   };
 
@@ -170,6 +192,7 @@ function Pedidos() {
     try {
       const pedido = {
         mesa_id: parseInt(mesaSeleccionada),
+        reserva_id: reservaActiva?.id || null,
         items: carrito.map(item => ({
           producto_id: item.producto_id,
           cantidad: item.cantidad,
@@ -187,7 +210,7 @@ function Pedidos() {
 
 
       if (mesaSeleccionada) {
-        await cargarPedidoActual(mesaSeleccionada);
+        await cargarPedidoActual(mesaSeleccionada, reservaActiva?.id);
       }
 
       cargarDatos();

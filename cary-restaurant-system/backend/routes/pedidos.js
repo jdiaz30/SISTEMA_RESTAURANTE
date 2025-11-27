@@ -6,7 +6,7 @@ const { verificarToken } = require('../middleware/auth');
 
 router.get('/', verificarToken, async (req, res) => {
   try {
-    const { mesa_id, estado } = req.query;
+    const { mesa_id, estado, reserva_id } = req.query;
 
     let query = `
       SELECT p.*, m.numero as mesa_numero,
@@ -21,6 +21,11 @@ router.get('/', verificarToken, async (req, res) => {
     if (mesa_id) {
       params.push(mesa_id);
       query += ` AND p.mesa_id = $${params.length}`;
+    }
+
+    if (reserva_id) {
+      params.push(reserva_id);
+      query += ` AND p.reserva_id = $${params.length}`;
     }
 
     if (estado) {
@@ -82,7 +87,7 @@ router.post('/', verificarToken, async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    const { mesa_id, items, notas } = req.body;
+    const { mesa_id, items, notas, reserva_id } = req.body;
     const usuario_id = req.usuario.id;
 
     if (!mesa_id || !items || items.length === 0) {
@@ -90,14 +95,31 @@ router.post('/', verificarToken, async (req, res) => {
       return res.status(400).json({ error: 'Mesa e items son requeridos' });
     }
 
+    // Obtener reserva activa si no se proporcionó
+    let reservaActiva = reserva_id;
+    if (!reservaActiva) {
+      const reservaResult = await client.query(`
+        SELECT id FROM reservas
+        WHERE mesa_id = $1
+          AND estado IN ('confirmada', 'completada')
+        ORDER BY fecha DESC, hora DESC
+        LIMIT 1
+      `, [mesa_id]);
 
+      if (reservaResult.rows.length > 0) {
+        reservaActiva = reservaResult.rows[0].id;
+      }
+    }
+
+    // Buscar pedido existente para esta RESERVA específica
     const pedidoExistente = await client.query(`
       SELECT id FROM pedidos
       WHERE mesa_id = $1
+        AND reserva_id = $2
         AND estado IN ('pendiente', 'preparando', 'listo')
       ORDER BY fecha_hora DESC
       LIMIT 1
-    `, [mesa_id]);
+    `, [mesa_id, reservaActiva]);
 
     let pedido_id;
     let pedidoResult;
@@ -150,10 +172,10 @@ router.post('/', verificarToken, async (req, res) => {
       const total = subtotal + impuesto;
 
       pedidoResult = await client.query(`
-        INSERT INTO pedidos (mesa_id, usuario_id, subtotal, impuesto, total, notas)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO pedidos (mesa_id, usuario_id, reserva_id, subtotal, impuesto, total, notas)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
-      `, [mesa_id, usuario_id, subtotal, impuesto, total, notas]);
+      `, [mesa_id, usuario_id, reservaActiva, subtotal, impuesto, total, notas]);
 
       pedido_id = pedidoResult.rows[0].id;
 

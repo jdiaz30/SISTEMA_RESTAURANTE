@@ -319,6 +319,12 @@ function Facturacion() {
   const generarFactura = async () => {
     let pagosFinal = [];
 
+    // Calcular total PENDIENTE (items no facturados)
+    const subtotalPendiente = detallesPedido.items.reduce((sum, item) =>
+      sum + (item.cantidad * item.precio_unitario), 0
+    );
+    const totalPendiente = subtotalPendiente * 1.18; // Incluir ITBIS
+
     if (tipoPago === 'unico') {
       if (!clienteNombre.trim()) {
         alert('Por favor ingrese el nombre del cliente');
@@ -327,8 +333,8 @@ function Facturacion() {
 
       if (metodosMultiples) {
         const totalMetodos = calcularTotalMetodosPagoUnico();
-        if (Math.abs(totalMetodos - parseFloat(detallesPedido.total)) > 0.01) {
-          alert(`La suma de los métodos de pago (RD$${totalMetodos.toFixed(2)}) debe ser igual al total (RD$${detallesPedido.total})`);
+        if (Math.abs(totalMetodos - totalPendiente) > 0.01) {
+          alert(`La suma de los métodos de pago (RD$${totalMetodos.toFixed(2)}) debe ser igual al total pendiente (RD$${totalPendiente.toFixed(2)})`);
           return;
         }
 
@@ -349,7 +355,7 @@ function Facturacion() {
         pagosFinal = [{
           cliente_nombre: clienteNombre,
           metodo_pago: metodoPago,
-          monto: parseFloat(detallesPedido.total),
+          monto: totalPendiente, // Usar total PENDIENTE no el original
         }];
       }
     } else {
@@ -670,29 +676,42 @@ function Facturacion() {
 
                   <div className="mb-6 pt-4 border-t-2 border-gray-200">
                     <div className="space-y-2">
-                      <div className="flex justify-between text-gray-600">
-                        <span>Subtotal:</span>
-                        <span>{formatearMoneda(detallesPedido.subtotal)}</span>
-                      </div>
-                      <div className="flex justify-between text-gray-600">
-                        <span>ITBIS (18%):</span>
-                        <span>{formatearMoneda(detallesPedido.impuesto)}</span>
-                      </div>
-                      <div className="flex justify-between text-xl font-bold text-primary pt-2 border-t border-gray-200">
-                        <span>Total Original:</span>
-                        <span>{formatearMoneda(detallesPedido.total)}</span>
-                      </div>
-                      {tipoPago === 'dividido' && pagos.length > 0 && (
-                        <div className="bg-warning/10 border border-warning rounded-lg p-3 mt-3">
-                          <div className="flex justify-between text-sm font-semibold text-gray-700">
-                            <span>Total Pendiente de Facturar:</span>
-                            <span className="text-lg text-secondary">{formatearMoneda(calcularTotalPendiente())}</span>
-                          </div>
-                          <p className="text-xs text-gray-600 mt-1">
-                            Solo se facturarán los items que agregues en los pagos
-                          </p>
-                        </div>
-                      )}
+                      {(() => {
+                        // Calcular subtotal de items PENDIENTES (no facturados)
+                        const subtotalPendiente = detallesPedido.items.reduce((sum, item) =>
+                          sum + (item.cantidad * item.precio_unitario), 0
+                        );
+                        const impuestoPendiente = subtotalPendiente * 0.18;
+                        const totalPendiente = subtotalPendiente + impuestoPendiente;
+
+                        return (
+                          <>
+                            <div className="flex justify-between text-gray-600">
+                              <span>Subtotal:</span>
+                              <span>{formatearMoneda(subtotalPendiente)}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-600">
+                              <span>ITBIS (18%):</span>
+                              <span>{formatearMoneda(impuestoPendiente)}</span>
+                            </div>
+                            <div className="flex justify-between text-xl font-bold text-primary pt-2 border-t border-gray-200">
+                              <span>Total Pendiente:</span>
+                              <span>{formatearMoneda(totalPendiente)}</span>
+                            </div>
+                            {tipoPago === 'dividido' && pagos.length > 0 && (
+                              <div className="bg-info/10 border border-info rounded-lg p-3 mt-3">
+                                <div className="flex justify-between text-sm font-semibold text-gray-700">
+                                  <span>Total a Facturar Ahora:</span>
+                                  <span className="text-lg text-secondary">{formatearMoneda(calcularTotalPendiente())}</span>
+                                </div>
+                                <p className="text-xs text-gray-600 mt-1">
+                                  Basado en los pagos agregados
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
 

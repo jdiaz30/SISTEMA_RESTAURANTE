@@ -57,6 +57,7 @@ export const reservasAPI = {
   create: (data) => api.post('/reservas', data),
   update: (id, data) => api.put(`/reservas/${id}`, data),
   cancel: (id) => api.delete(`/reservas/${id}`),
+  getReservaActiva: (mesaId) => api.get(`/reservas/mesa/${mesaId}/activa`),
 
   // Para clientes (sin autenticación)
   verificar: (codigo, telefono) =>
