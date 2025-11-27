@@ -76,7 +76,9 @@ export const productosAPI = {
 // ==================== PEDIDOS ====================
 export const pedidosAPI = {
   getAll: (params) => api.get('/pedidos', { params }),
-  getById: (id) => api.get(`/pedidos/${id}`),
+  getById: (id, incluirFacturados = false) => api.get(`/pedidos/${id}`, {
+    params: { incluir_facturados: incluirFacturados }
+  }),
   create: (data) => api.post('/pedidos', data),
   updateEstado: (id, estado) => api.patch(`/pedidos/${id}/estado`, { estado }),
   deleteItem: (pedidoId, itemId) => api.delete(`/pedidos/${pedidoId}/items/${itemId}`),

@@ -44,7 +44,8 @@ function Pedidos() {
       const response = await pedidosAPI.getAll({ mesa_id: mesaId, estado: 'pendiente,preparando,listo' });
       if (response.data && response.data.length > 0) {
         const pedidoId = response.data[0].id;
-        const pedidoDetalle = await pedidosAPI.getById(pedidoId);
+        // Incluir items facturados (true) para mostrar todo el pedido en Pedidos
+        const pedidoDetalle = await pedidosAPI.getById(pedidoId, true);
         setPedidoActual(pedidoDetalle.data);
       } else {
         setPedidoActual(null);
@@ -172,7 +173,9 @@ function Pedidos() {
         items: carrito.map(item => ({
           producto_id: item.producto_id,
           cantidad: item.cantidad,
-          precio_unitario: item.precio_unitario
+          precio_unitario: item.precio_unitario,
+          posicion: item.posicion,
+          notas: item.notas || null
         }))
       };
 

@@ -107,6 +107,11 @@ function ImprimirFactura() {
             <div>
               <h3 className="font-semibold text-gray-700 mb-2">Cliente:</h3>
               <p className="text-gray-800">{factura.cliente_nombre}</p>
+              {factura.tipo_factura === 'dividida' && (
+                <p className="text-xs text-primary mt-1">
+                  Factura Individual - Pago Dividido (Parte {factura.orden_division})
+                </p>
+              )}
             </div>
             <div>
               <h3 className="font-semibold text-gray-700 mb-2">Mesa:</h3>

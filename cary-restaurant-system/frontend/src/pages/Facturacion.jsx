@@ -49,20 +49,27 @@ function Facturacion() {
 
   const seleccionarPedido = async (pedido) => {
     try {
-      setPedidoSeleccionado(pedido);
-      const response = await pedidosAPI.getById(pedido.pedido_id);
-      setDetallesPedido(response.data);
+      // PRIMERO: Limpiar TODO el estado ANTES de cargar
+      setPedidoSeleccionado(null);
+      setDetallesPedido(null);
       setClienteNombre('');
       setMetodoPago('efectivo');
       setMetodosMultiples(false);
       setMetodosPagoUnico([{ metodo: 'efectivo', monto: '', referencia: '' }]);
       setTipoPago('unico');
-      setPagos([]);
+      setPagos([]); // ← CRÍTICO: Limpiar pagos ANTES de cargar el pedido
       setNuevoPago({ cliente_nombre: '', metodo_pago: 'efectivo', monto: '', referencia: '' });
       setProductosSeleccionados([]);
       setPosicionesSeleccionadas([]);
       setMostrarSeleccionProductos(false);
       setMostrarPosiciones(false);
+
+      // SEGUNDO: Cargar el pedido con items NO facturados
+      const response = await pedidosAPI.getById(pedido.pedido_id);
+
+      // TERCERO: Actualizar estados
+      setPedidoSeleccionado(pedido);
+      setDetallesPedido(response.data);
     } catch (error) {
       console.error('Error al cargar detalles:', error);
       alert('Error al cargar detalles del pedido');
@@ -235,8 +242,34 @@ function Facturacion() {
     return pagos.reduce((sum, pago) => sum + parseFloat(pago.monto), 0);
   };
 
+  // Calcular total de items NO facturados (solo los que se pueden pagar)
+  const calcularTotalPendiente = () => {
+    if (!detallesPedido || !detallesPedido.items) return 0;
+
+    // Sumar solo los items que NO están en la lista de pagos ya agregados
+    const itemsYaPagados = new Set();
+    pagos.forEach(pago => {
+      if (pago.productos) {
+        pago.productos.forEach(id => itemsYaPagados.add(id));
+      }
+      if (pago.posiciones) {
+        detallesPedido.items
+          .filter(item => pago.posiciones.includes(item.posicion))
+          .forEach(item => itemsYaPagados.add(item.id));
+      }
+    });
+
+    // Calcular subtotal de items pendientes
+    const subtotalPendiente = detallesPedido.items
+      .filter(item => !itemsYaPagados.has(item.id))
+      .reduce((sum, item) => sum + (item.cantidad * item.precio_unitario), 0);
+
+    const impuestoPendiente = subtotalPendiente * 0.18;
+    return subtotalPendiente + impuestoPendiente;
+  };
+
   const calcularRestante = () => {
-    return parseFloat(detallesPedido.total) - calcularTotalPagos();
+    return calcularTotalPendiente() - calcularTotalPagos();
   };
 
   const agregarMetodoPago = () => {
@@ -325,13 +358,32 @@ function Facturacion() {
         return;
       }
 
-      const restante = calcularRestante();
-      if (Math.abs(restante) > 0.01) {
-        alert(`Falta pagar RD$${restante.toFixed(2)}. La suma debe ser igual al total.`);
+      // Filtrar pagos para SOLO incluir posiciones/productos que NO estén facturados
+      // Obtener posiciones que tienen items en detallesPedido (los no facturados)
+      const posicionesDisponibles = new Set(
+        detallesPedido.items.map(item => item.posicion).filter(p => p != null)
+      );
+      const productosDisponibles = new Set(
+        detallesPedido.items.map(item => item.id)
+      );
+
+      pagosFinal = pagos.filter(pago => {
+        // Si el pago tiene posiciones, verificar que al menos una esté disponible
+        if (pago.posiciones && pago.posiciones.length > 0) {
+          return pago.posiciones.some(pos => posicionesDisponibles.has(pos));
+        }
+        // Si el pago tiene productos, verificar que al menos uno esté disponible
+        if (pago.productos && pago.productos.length > 0) {
+          return pago.productos.some(prod => productosDisponibles.has(prod));
+        }
+        // Si no tiene ni posiciones ni productos específicos, incluirlo
+        return true;
+      });
+
+      if (pagosFinal.length === 0) {
+        alert('No hay pagos válidos para facturar. Las posiciones/productos seleccionados ya fueron facturados.');
         return;
       }
-
-      pagosFinal = pagos;
     }
 
     try {
@@ -342,13 +394,38 @@ function Facturacion() {
         pagos: pagosFinal,
       });
 
-      const facturaId = response.data.factura.id;
       const numeroMesa = pedidoSeleccionado.mesa_numero;
+      const facturas = response.data.facturas;
+      const esPagoDividido = response.data.pago_dividido;
+      const mesaCerrada = response.data.mesa_cerrada;
+      const itemsPendientes = response.data.items_pendientes;
 
-      alert(`✓ Factura generada exitosamente\n\nMesa ${numeroMesa} ha sido cerrada y liberada.\n\nSe abrirá la vista de impresión.`);
+      if (esPagoDividido) {
+        // Múltiples facturas generadas
+        const estadoMesa = mesaCerrada
+          ? 'Mesa ha sido cerrada y liberada.'
+          : 'Mesa sigue activa. Hay posiciones pendientes de facturar.';
 
-      window.open(`/factura/${facturaId}/imprimir`, '_blank');
+        alert(`✓ ${facturas.length} facturas generadas exitosamente\n\n${estadoMesa}\n\nSe abrirán las vistas de impresión de cada factura.`);
 
+        // Abrir ventana de impresión para cada factura
+        facturas.forEach((factura, index) => {
+          setTimeout(() => {
+            window.open(`/factura/${factura.id}/imprimir`, '_blank');
+          }, index * 500); // Delay de 500ms entre ventanas para evitar bloqueos
+        });
+      } else {
+        // Una sola factura
+        const facturaId = facturas[0].id;
+        const estadoMesa = mesaCerrada
+          ? 'Mesa ha sido cerrada y liberada.'
+          : 'Mesa sigue activa. Hay items pendientes de facturar.';
+
+        alert(`✓ Factura generada exitosamente\n\n${estadoMesa}\n\nSe abrirá la vista de impresión.`);
+        window.open(`/factura/${facturaId}/imprimir`, '_blank');
+      }
+
+      // Resetear el formulario
       setPedidoSeleccionado(null);
       setDetallesPedido(null);
       setClienteNombre('');
@@ -503,7 +580,22 @@ function Facturacion() {
                               ))}
                               {tipoPago === 'dividido' && !posicionYaPagada && (
                                 <button
-                                  onClick={() => {
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+
+                                    console.log('Click en botón - Posición:', posicion);
+                                    console.log('Items del pedido:', detallesPedido.items);
+
+                                    // Obtener los IDs de productos de esta posición
+                                    const productosDeEstaPosicion = detallesPedido.items
+                                      .filter(item => item.posicion === posicion)
+                                      .map(item => item.id);
+
+                                    console.log('Productos de esta posición:', productosDeEstaPosicion);
+                                    console.log('Total posición:', totalPosicion);
+
                                     setNuevoPago({
                                       cliente_nombre: `Posición ${posicion}`,
                                       metodo_pago: 'efectivo',
@@ -511,7 +603,10 @@ function Facturacion() {
                                       referencia: ''
                                     });
                                     setPosicionesSeleccionadas([posicion]);
-                                    setProductosSeleccionados([]);
+                                    // Asignar automáticamente los productos de esta posición
+                                    setProductosSeleccionados(productosDeEstaPosicion);
+
+                                    console.log('Estados actualizados');
                                   }}
                                   className="w-full mt-2 px-3 py-1.5 bg-secondary text-white rounded hover:bg-secondary/90 transition-colors text-sm font-medium"
                                 >
@@ -584,9 +679,20 @@ function Facturacion() {
                         <span>{formatearMoneda(detallesPedido.impuesto)}</span>
                       </div>
                       <div className="flex justify-between text-xl font-bold text-primary pt-2 border-t border-gray-200">
-                        <span>Total:</span>
+                        <span>Total Original:</span>
                         <span>{formatearMoneda(detallesPedido.total)}</span>
                       </div>
+                      {tipoPago === 'dividido' && pagos.length > 0 && (
+                        <div className="bg-warning/10 border border-warning rounded-lg p-3 mt-3">
+                          <div className="flex justify-between text-sm font-semibold text-gray-700">
+                            <span>Total Pendiente de Facturar:</span>
+                            <span className="text-lg text-secondary">{formatearMoneda(calcularTotalPendiente())}</span>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1">
+                            Solo se facturarán los items que agregues en los pagos
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1170,7 +1276,11 @@ function Facturacion() {
                       disabled={procesando}
                       className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {procesando ? 'Procesando...' : 'Generar Factura y Cerrar Mesa'}
+                      {procesando ? 'Procesando...' :
+                        (tipoPago === 'dividido' && calcularTotalPendiente() < parseFloat(detallesPedido.total) - 0.01)
+                          ? 'Generar Factura (Pago Parcial)'
+                          : 'Generar Factura y Cerrar Mesa'
+                      }
                     </button>
 
                     <button

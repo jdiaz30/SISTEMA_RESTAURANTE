@@ -45,6 +45,7 @@ router.get('/', verificarToken, async (req, res) => {
 router.get('/:id', verificarToken, async (req, res) => {
   try {
     const { id } = req.params;
+    const { incluir_facturados } = req.query; // Parámetro opcional
 
     const pedido = await pool.query('SELECT * FROM pedidos WHERE id = $1', [id]);
 
@@ -52,11 +53,16 @@ router.get('/:id', verificarToken, async (req, res) => {
       return res.status(404).json({ error: 'Pedido no encontrado' });
     }
 
+    // Por defecto, solo retornar items NO facturados (para facturación)
+    // Si incluir_facturados=true, retornar todos (para vista de pedidos)
+    const filtroFacturado = incluir_facturados === 'true' ? '' : 'AND pi.facturado = FALSE';
+
     const items = await pool.query(`
       SELECT pi.*, p.nombre as producto_nombre
       FROM pedido_items pi
       LEFT JOIN productos p ON pi.producto_id = p.id
-      WHERE pi.pedido_id = $1
+      WHERE pi.pedido_id = $1 ${filtroFacturado}
+      ORDER BY pi.posicion, pi.id
     `, [id]);
 
     res.json({
