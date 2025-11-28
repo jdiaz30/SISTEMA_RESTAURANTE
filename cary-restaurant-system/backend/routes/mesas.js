@@ -96,17 +96,20 @@ router.get('/ocupadas-con-pedidos', verificarToken, async (req, res) => {
         m.numero as mesa_numero,
         a.nombre as area_nombre,
         p.id as pedido_id,
-        p.subtotal,
-        p.impuesto,
-        p.total,
         p.estado as pedido_estado,
-        p.fecha_hora as pedido_fecha
+        p.fecha_hora as pedido_fecha,
+        -- Calcular subtotal e impuesto SOLO de items NO facturados
+        COALESCE(SUM(CASE WHEN pi.facturado = FALSE THEN pi.cantidad * pi.precio_unitario ELSE 0 END), 0) as subtotal_pendiente,
+        COALESCE(SUM(CASE WHEN pi.facturado = FALSE THEN pi.cantidad * pi.precio_unitario ELSE 0 END) * 0.18, 0) as impuesto_pendiente,
+        COALESCE(SUM(CASE WHEN pi.facturado = FALSE THEN pi.cantidad * pi.precio_unitario ELSE 0 END) * 1.18, 0) as total
       FROM mesas m
       INNER JOIN pedidos p ON m.id = p.mesa_id
       LEFT JOIN areas a ON m.area_id = a.id
+      LEFT JOIN pedido_items pi ON p.id = pi.pedido_id
       WHERE m.estado = 'ocupada'
         AND p.estado IN ('pendiente', 'preparando', 'listo')
         AND m.activo = TRUE
+      GROUP BY m.id, m.numero, a.nombre, p.id, p.estado, p.fecha_hora
       ORDER BY m.numero
     `);
 

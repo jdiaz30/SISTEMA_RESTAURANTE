@@ -55,8 +55,8 @@ function Pedidos() {
       const response = await pedidosAPI.getAll(params);
       if (response.data && response.data.length > 0) {
         const pedidoId = response.data[0].id;
-        // Incluir items facturados (true) para mostrar todo el pedido en Pedidos
-        const pedidoDetalle = await pedidosAPI.getById(pedidoId, true);
+        // Solo mostrar items NO facturados (false) para ocultar lo ya pagado
+        const pedidoDetalle = await pedidosAPI.getById(pedidoId, false);
         setPedidoActual(pedidoDetalle.data);
       } else {
         setPedidoActual(null);
@@ -297,7 +297,14 @@ function Pedidos() {
 
               <div className="text-sm text-gray-700 mb-2">
                 <p>Pedido #{pedidoActual.id} - Estado: <span className="capitalize font-semibold">{pedidoActual.estado}</span></p>
-                <p className="text-lg font-bold text-primary">Total: RD${parseFloat(pedidoActual.total).toFixed(2)}</p>
+                <p className="text-lg font-bold text-primary">
+                  Total: RD${(() => {
+                    const subtotal = pedidoActual.items?.reduce((sum, item) =>
+                      sum + (item.cantidad * parseFloat(item.precio_unitario)), 0) || 0;
+                    const total = subtotal * 1.18; // Incluir ITBIS 18%
+                    return total.toFixed(2);
+                  })()}
+                </p>
               </div>
 
               {mostrarPedidoActual && pedidoActual.items && (

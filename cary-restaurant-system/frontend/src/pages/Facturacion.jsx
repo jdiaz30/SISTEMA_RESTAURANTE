@@ -431,22 +431,43 @@ function Facturacion() {
         window.open(`/factura/${facturaId}/imprimir`, '_blank');
       }
 
-      // Resetear el formulario
-      setPedidoSeleccionado(null);
-      setDetallesPedido(null);
-      setClienteNombre('');
-      setMetodoPago('efectivo');
-      setMetodosMultiples(false);
-      setMetodosPagoUnico([{ metodo: 'efectivo', monto: '', referencia: '' }]);
-      setTipoPago('unico');
-      setPagos([]);
-      setNuevoPago({ cliente_nombre: '', metodo_pago: 'efectivo', monto: '', referencia: '' });
-      setProductosSeleccionados([]);
-      setPosicionesSeleccionadas([]);
-      setMostrarSeleccionProductos(false);
-      setMostrarPosiciones(false);
+      // Si la mesa fue cerrada, resetear todo
+      if (mesaCerrada) {
+        setPedidoSeleccionado(null);
+        setDetallesPedido(null);
+        setClienteNombre('');
+        setMetodoPago('efectivo');
+        setMetodosMultiples(false);
+        setMetodosPagoUnico([{ metodo: 'efectivo', monto: '', referencia: '' }]);
+        setTipoPago('unico');
+        setPagos([]);
+        setNuevoPago({ cliente_nombre: '', metodo_pago: 'efectivo', monto: '', referencia: '' });
+        setProductosSeleccionados([]);
+        setPosicionesSeleccionadas([]);
+        setMostrarSeleccionProductos(false);
+        setMostrarPosiciones(false);
+        cargarMesasOcupadas();
+      } else {
+        // Si la mesa sigue activa (pago parcial), recargar el pedido actualizado
+        const pedidoActualizado = await pedidosAPI.getById(pedidoSeleccionado.pedido_id);
+        setDetallesPedido(pedidoActualizado.data);
 
-      cargarMesasOcupadas();
+        // Limpiar solo los campos de pago, mantener el pedido seleccionado
+        setClienteNombre('');
+        setMetodoPago('efectivo');
+        setMetodosMultiples(false);
+        setMetodosPagoUnico([{ metodo: 'efectivo', monto: '', referencia: '' }]);
+        setTipoPago('unico');
+        setPagos([]);
+        setNuevoPago({ cliente_nombre: '', metodo_pago: 'efectivo', monto: '', referencia: '' });
+        setProductosSeleccionados([]);
+        setPosicionesSeleccionadas([]);
+        setMostrarSeleccionProductos(false);
+        setMostrarPosiciones(false);
+
+        // Recargar las mesas para actualizar el monto en la tarjeta
+        cargarMesasOcupadas();
+      }
     } catch (error) {
       console.error('Error al generar factura:', error);
       const mensaje = error.response?.data?.error || 'Error al generar la factura';
@@ -509,7 +530,7 @@ function Facturacion() {
                           {formatearMoneda(mesa.total)}
                         </p>
                         <p className="text-xs text-gray-500 capitalize">
-                          {mesa.pedido_estado.replace('_', ' ')}
+                          pendiente
                         </p>
                       </div>
                     </div>
@@ -698,17 +719,6 @@ function Facturacion() {
                               <span>Total Pendiente:</span>
                               <span>{formatearMoneda(totalPendiente)}</span>
                             </div>
-                            {tipoPago === 'dividido' && pagos.length > 0 && (
-                              <div className="bg-info/10 border border-info rounded-lg p-3 mt-3">
-                                <div className="flex justify-between text-sm font-semibold text-gray-700">
-                                  <span>Total a Facturar Ahora:</span>
-                                  <span className="text-lg text-secondary">{formatearMoneda(calcularTotalPendiente())}</span>
-                                </div>
-                                <p className="text-xs text-gray-600 mt-1">
-                                  Basado en los pagos agregados
-                                </p>
-                              </div>
-                            )}
                           </>
                         );
                       })()}
@@ -853,21 +863,6 @@ function Facturacion() {
                               )}
                             </div>
                           ))}
-
-                          <div className="bg-gray-50 rounded-lg p-3 flex justify-between items-center">
-                            <span className="text-sm font-medium text-gray-700">Total ingresado:</span>
-                            <span className={`text-lg font-bold ${
-                              Math.abs(calcularTotalMetodosPagoUnico() - parseFloat(detallesPedido?.total || 0)) < 0.01
-                                ? 'text-success'
-                                : 'text-danger'
-                            }`}>
-                              {formatearMoneda(calcularTotalMetodosPagoUnico())}
-                            </span>
-                          </div>
-
-                          <p className="text-xs text-gray-500">
-                            Total a pagar: {formatearMoneda(detallesPedido?.total || 0)}
-                          </p>
                         </div>
                       )}
                     </div>
@@ -956,25 +951,6 @@ function Facturacion() {
                               )}
                             </div>
                           ))}
-
-                          <div className="pt-3 border-t border-gray-200">
-                            <div className="flex justify-between text-sm mb-1">
-                              <span>Total Pagado:</span>
-                              <span className="font-semibold">
-                                {formatearMoneda(calcularTotalPagos())}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span>Restante:</span>
-                              <span
-                                className={`font-semibold ${
-                                  calcularRestante() > 0.01 ? 'text-danger' : 'text-success'
-                                }`}
-                              >
-                                {formatearMoneda(calcularRestante())}
-                              </span>
-                            </div>
-                          </div>
                         </div>
                       )}
 
@@ -1110,13 +1086,6 @@ function Facturacion() {
                                 )}
                               </div>
                             ))}
-
-                            <div className="bg-gray-50 rounded-lg p-3 flex justify-between items-center">
-                              <span className="text-sm font-medium text-gray-700">Total ingresado:</span>
-                              <span className="text-lg font-bold text-primary">
-                                {formatearMoneda(calcularTotalMetodosPagoDividido())}
-                              </span>
-                            </div>
                           </div>
                         )}
 
@@ -1126,15 +1095,6 @@ function Facturacion() {
                               Monto a Pagar
                             </label>
                             <div className="flex gap-2 flex-wrap">
-                              {!mostrarSeleccionProductos && !mostrarPosiciones && pagos.length > 0 && calcularRestante() > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={aplicarMontoRestante}
-                                  className="text-xs text-success hover:underline font-medium"
-                                >
-                                  Usar restante ({formatearMoneda(calcularRestante())})
-                                </button>
-                              )}
                               {getPosicionesDisponibles().length > 0 && (
                                 <button
                                   type="button"
